@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>GitHub API v3</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="css/bootstrap.min.css">
+  <link rel="shortcut icon" href="img/favicon.png">
+  <link rel="apple-touch-icon" href="img/touch-icon.png">
+</head>
+<body>
+
+<div class="container">
+  <h4 class="text-muted p-0 mb-3">GitHub API v3</h4>
+  <div class="container bg-light">
+    <div class="row justify-content-between mb-3">
+      <div class="col-4 btn btn-group-toggle" data-toggle="buttons">
+        <label class="btn btn-success active"><input type="radio" name="options" class="option_topic" value="selectUsers" autocomplete="off">Users</label>
+        <label class="btn btn-success"><input type="radio" name="options" class="option_topic" value="selectRepos" autocomplete="off">Repos</label>
+        <label class="btn btn-success"><input type="radio" name="options" class="option_topic" value="selectIssues" autocomplete="off">Issues</label>
+        <!--<label class="btn btn-success"><input type="radio" name="options" class="option_topic" value="selectSearch" autocomplete="off">Search</label>-->
+        <label class="btn btn-success"><input type="radio" name="options" class="option_topic" value="selectAuth" autocomplete="off">Auth</label>
+        <label class="btn btn-success"><input type="radio" name="options" class="option_topic" value="selectZen" autocomplete="off">Zen</label>
+        <label class="btn btn-success"><input type="radio" name="options" class="option_topic" value="selectAdHoc" autocomplete="off">Ad Hoc</label>
+      </div>
+      <div class="col-2">
+        <small>
+          api call limit <span id="callLimit"></span><br>
+          api calls remaining <span id="callRemaining"></span>
+        </small>
+      </div>
+    </div>
+    <div class="row ml-2 mb-2 text-danger">
+      <div id="errorView" class="d-none">
+      </div>
+    </div>
+    <div class="row ml-2">
+      <div id="viewWrapper" class="col-8">
+        <div id="usersView" class="d-block">
+          <div class="form-group">
+            <label for="username">Username</label>
+            <input class="form-control" type="text" id="username" placeholder="Enter a username">
+            <button type="submit" class="btn btn-info my-3" id="submitUser">Submit</button>
+          </div>
+          <div id="usersResponse" class="p-1"></div>
+        </div>
+        <div id="reposView" class="d-none">
+          <div class="form-group">
+            <label for="repoUsername">Username</label>
+            <input class="form-control mb-2" type="text" id="repoUsername" placeholder="Enter a user name">
+            <label for="repoName">Repository</label>
+            <input class="form-control" type="text" id="repoName" placeholder="Enter a repository name">
+            <button type="submit" class="btn btn-info my-3" id="submitRepo">Submit</button>
+          </div>
+          <div id="repoResponse" class="p-1"></div>
+        </div>
+        <div id="issuesView" class="d-none">
+          <div class="form-group">
+            <label for="issueRepoName">Repository</label>
+            <input class="form-control" type="text" id="issueRepoName" placeholder="Enter a repository name e.g. rails/rails">
+            <button type="submit" class="btn btn-info my-3" id="submitIssue">Submit</button>
+          </div>
+          <div id="issueResponse" class="p-1"></div>
+        </div>
+        <div id="searchView" class="d-none">
+          search view goes here
+        </div>
+        <div id="authView" class="d-none">
+          <div class="form-group">
+            <label for="authTokenText">OAuth Token</label>
+            <input class="form-control" type="password" id="authTokenText" placeholder="Enter a token">
+            <button type="submit" class="btn btn-info my-3" id="submitAuth">Submit</button>
+          </div>
+          <div id="authResponse" class="p-1"></div>
+        </div>
+        <div id="zenView" class="d-none">
+          <button type="submit" class="btn btn-info my-3" id="submitZen">Get Zen</button>
+          <div id="zenResponse" class="p-1 mb-2"></div>
+        </div>
+        <div id="adhocView" class="d-none">
+          <div class="input-group">
+            <label for="adhocPath">Path</label>
+            <div class="input-group mb-3">
+              <input class="form-control" type="text" id="adhocPath" placeholder="Enter path">
+              <div class="input-group-append">
+                <button class="btn btn-secondary" type="button" onclick="adhocPath.value = '/search/repositories?q=stars:120000..300000';">Use Sample</button>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-info my-3" id="submitAdHoc">Submit</button>
+          </div>
+          <div id="adhocResponse" class="p-1"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="text/javascript" src="js/jquery-3.3.1.min.js"></script>
+<script type="text/javascript" src="js/bootstrap.bundle.min.js"></script>
+</body>
+
+<script>
+    const usersView = document.getElementById('usersView');
+    const reposView = document.getElementById('reposView');
+    const issuesView = document.getElementById('issuesView');
+    //const searchView = document.getElementById('searchView');
+    const authView = document.getElementById('authView');
+    const zenView = document.getElementById('zenView');
+    const adhocView = document.getElementById('adhocView');
+
+    const callLimit = document.getElementById('callLimit');
+    const callRemaining = document.getElementById('callRemaining');
+
+    document.getElementById('submitUser').addEventListener('click', getUser, false);
+    document.getElementById('submitRepo').addEventListener('click', getRepo, false);
+    document.getElementById('submitIssue').addEventListener('click', getIssue, false);
+    document.getElementById('submitAuth').addEventListener('click', getAuth, false);
+    document.getElementById('submitZen').addEventListener('click', getZen, false);
+    document.getElementById('submitAdHoc').addEventListener('click', getAdHoc, false);
+
+    $('input[type=radio]').change( function() {
+        let option = document.querySelector(".option_topic:checked").value;
+        updateDisplay(option);
+    });
+
+    function hideAll() {
+        usersView.className = "d-none";
+        reposView.className = "d-none";
+        issuesView.className = "d-none";
+        //searchView.className = "d-none";
+        authView.className = "d-none";
+        zenView.className = "d-none";
+        adhocView.className = "d-none";
+    }
+
+    function clear(element) {
+        while(element.firstChild)
+          element.removeChild(element.firstChild);
+    }
+
+    function updateDisplay(viewSelected) {
+        hideAll();
+        switch (viewSelected) {
+            case 'selectUsers':
+                usersView.className = "d-block";
+                break;
+            case 'selectRepos':
+                reposView.className = "d-block";
+                break;
+            case 'selectIssues':
+                issuesView.className = "d-block";
+                break;
+            //case 'selectSearch':
+            //    searchView.className = "d-block";
+            //    break;
+            case 'selectAuth':
+                document.getElementById('authResponse').innerText = '';
+                authView.className = "d-block";
+                break;
+            case 'selectZen':
+                zenView.className = "d-block";
+                break;
+            case 'selectAdHoc':
+                adhocView.className = "d-block";
+                break;
+            default:
+                throw "view not found!";
+        }
+    }
+
+    function updateErrorView(message) {
+        const errorView = document.getElementById('errorView');
+        errorView.className = 'd-block';
+        errorView.innerText = message;
+    }
+
+    function showResponseStatus(status) {
+        const errorView = document.getElementById('errorView');
+        if (status == '200 OK') {
+            errorView.className = 'd-none';
+        }
+        else {
+            errorView.className = 'd-block';
+            errorView.innerText = 'HTTP status ' + status;
+        }
+    }
+
+    async function callFetch(path) {
+        try {
+            const url = 'https://api.github.com' + path;
+            //fetch(url);
+            const response = await fetch(url, {cache: "no-store"}); //bypass HTTP cache. worker converts 304 to 200
+            console.log(response.status);
+            console.log(response.ok);
+            console.log(response.statusText);
+            //console.log(response.headers);
+
+            const responseHeaders = response.headers;
+            const responseX_RateLimit_Limit = responseHeaders.get('X-RateLimit-Limit');
+            const responseX_RateLimit_Remaining = responseHeaders.get('X-RateLimit-Remaining');
+            const contentType = responseHeaders.get('Content-Type');
+            console.log('contentType = ' + contentType);
+
+            let responseText = '';
+            let responseJson = '';
+            const isText = contentType.includes('text/plain');
+            const isJson = contentType.includes('application/json');
+
+            if (isJson) {
+                responseJson = await response.json();
+                console.log(JSON.stringify(responseJson));
+            } else if (isText) {
+                responseText = await response.text();
+                console.log(responseText);
+            }
+            return {
+                responseStatus : response.status + ' ' + response.statusText,
+                textResource: responseText,
+                jsonResource: responseJson,
+                callLimit: responseX_RateLimit_Limit,
+                callRemaining: responseX_RateLimit_Remaining
+            };
+        }
+        catch (error) {
+            updateErrorView(error);
+        }
+    }
+
+    async function getUser() {
+        const user = document.getElementById('username').value;
+
+        let path = '/search/users?q=' + user +' in:login';
+        //let path = '/search/users?q=' + user;
+
+        /*
+        let results = '';
+        let token = sessionStorage.getItem('gitHubApiAuthToken');
+        let authResults = '';
+        if (token.length > 0) {
+            let headers = new Headers();
+            headers.append('Authorization', 'token ' + token);
+            authResults = await fetch('https://api.github.com' + path, { "headers" : headers });
+            }
+        }
+        */
+
+        const results = await callFetch(path);
+        showResponseStatus(results.responseStatus);
+
+        callLimit.innerText = results.callLimit;
+        callRemaining.innerText = results.callRemaining;
+        //const responseText = results.textResource;
+        const jsonResource = results.jsonResource;
+        const items = jsonResource.items;
+        const totalCount = jsonResource.total_count;
+
+        let userResponse = document.getElementById('usersResponse');
+        clear(userResponse);
+
+        let countElement = document.createElement('div');
+        countElement.className = "row justify-content-end text-secondary pr-3";
+        countElement.innerHTML = "<small>records returned: " + totalCount.toString() + "</small>";
+        userResponse.appendChild(countElement);
+
+        items.forEach (function(item) {
+            let title = document.createElement('h4');
+            title.innerText = item.login;
+            userResponse.appendChild(title);
+
+            let list = document.createElement('ul');
+            list.class = 'list-group';
+
+            for (let prop in item) {
+                let span = document.createElement('span');
+                span.innerText = prop + ' = ' + item[prop];
+                let listItem = document.createElement('li');
+                listItem.class = 'list-group-item';
+                listItem.appendChild(span);
+                list.appendChild(listItem);
+            }
+
+            userResponse.appendChild(list);
+        });
+
+    }
+
+    async function getRepo() {
+        const username = document.getElementById('repoUsername').value;
+        const reponame = document.getElementById('repoName').value;
+
+        let path = '';
+        if (reponame.length > 0)
+            path = '/repos/' + username + '/' + reponame;
+        else
+            path = '/users/' + username + '/repos';
+
+        const results = await callFetch(path);
+        showResponseStatus(results.responseStatus);
+
+        callLimit.innerText = results.callLimit;
+        callRemaining.innerText = results.callRemaining;
+        //const responseText = results.textResource;
+        let items = results.jsonResource;
+
+        if (!Array.isArray(items)) {
+            let arr = [items];
+            items = arr;
+        }
+
+        let repoResponse = document.getElementById('repoResponse');
+        clear(repoResponse);
+
+        let repoCount = document.createElement('div');
+        repoCount.className = "row justify-content-end text-secondary pr-3";
+        repoCount.innerHTML = "<small>records returned: " + items.length + "</small>";
+        repoResponse.appendChild(repoCount);
+
+        items.forEach (function(item) {
+            let title = document.createElement('h4');
+            title.innerText = item.name;
+            repoResponse.appendChild(title);
+
+            let list = document.createElement('ul');
+            list.class = 'list-group';
+
+            for (let prop in item) {
+                let span = document.createElement('span');
+                span.innerText = prop + ' = ' + item[prop];
+                let listItem = document.createElement('li');
+                listItem.class = 'list-group-item';
+                listItem.appendChild(span);
+                list.appendChild(listItem);
+            }
+
+            repoResponse.appendChild(list);
+        });
+    }
+
+    async function getIssue() {
+        //const username = document.getElementById('repoUsername').value;
+        const reponame = document.getElementById('issueRepoName').value;
+
+        let path = '/repos/' + reponame + '/issues';
+        const results = await callFetch(path);
+        showResponseStatus(results.responseStatus);
+
+        callLimit.innerText = results.callLimit;
+        callRemaining.innerText = results.callRemaining;
+        //const responseText = results.textResource;
+        const items = results.jsonResource;
+
+        let issueResponse = document.getElementById('issueResponse');
+        clear(issueResponse);
+
+        let issueCount = document.createElement('div');
+        issueCount.className = "row justify-content-end text-secondary pr-3";
+        issueCount.innerHTML = "<small>records returned: " + items.length + "</small>";
+        issueResponse.appendChild(issueCount);
+
+        items.forEach (function(item) {
+            let title = document.createElement('h4');
+            title.innerText = item.title;
+            issueResponse.appendChild(title);
+
+            let list = document.createElement('ul');
+            list.class = 'list-group';
+
+            for (let prop in item) {
+                let span = document.createElement('span');
+                span.innerText = prop + ' = ' + item[prop];
+                let listItem = document.createElement('li');
+                listItem.class = 'list-group-item';
+                listItem.appendChild(span);
+                list.appendChild(listItem);
+            }
+
+            issueResponse.appendChild(list);
+        });
+    }
+
+    async function getAuth() {
+        const authTokenText = document.getElementById('authTokenText');
+        const token = authTokenText.value;
+        sessionStorage.setItem('gitHubApiAuthToken', token);
+
+        document.getElementById('authResponse').innerText = 'OAuth token saved.'
+        authTokenText.value = '';
+    }
+
+    async function getZen() {
+        const path = '/zen';
+
+        const results = await callFetch(path);
+        showResponseStatus(results.responseStatus);
+
+        callLimit.innerText = results.callLimit;
+        callRemaining.innerText = results.callRemaining;
+        const responseText = results.textResource;
+
+        let zenResponse = document.getElementById('zenResponse');
+        clear(zenResponse);
+
+        zenResponse.innerText = responseText;
+    }
+
+    async function getAdHoc() {
+        //const username = document.getElementById('repoUsername').value;
+        const adhocPath = document.getElementById('adhocPath').value;
+
+        let path = adhocPath;
+        const results = await callFetch(path);
+        showResponseStatus(results.responseStatus);
+
+        callLimit.innerText = results.callLimit;
+        callRemaining.innerText = results.callRemaining;
+
+        const temp = results.jsonResource;
+        let items = null;
+        if (temp.items != null)
+            items = temp.items;
+        else
+            items = temp;
+
+        let adhocResponse = document.getElementById('adhocResponse');
+        clear(adhocResponse);
+
+        let adhocCount = document.createElement('div');
+        adhocCount.className = "row justify-content-end text-secondary pr-3";
+        adhocCount.innerHTML = "<small>records returned: " + items.length + "</small>";
+        adhocResponse.appendChild(adhocCount);
+
+        items.forEach (function(item) {
+            let title = document.createElement('h4');
+            title.innerText = 'Untitled';
+
+            let list = document.createElement('ul');
+            list.class = 'list-group';
+
+            for (let prop in item) {
+                let span = document.createElement('span');
+                span.innerText = prop + ' = ' + item[prop];
+                let listItem = document.createElement('li');
+                listItem.class = 'list-group-item';
+                listItem.appendChild(span);
+                list.appendChild(listItem);
+                if (prop.includes('name') || prop.includes('title') || prop.includes('id') )
+                    title.innerText = item[prop];
+            }
+            adhocResponse.appendChild(list);
+            adhocResponse.insertBefore(title, list);
+        });
+    }
+
+</script>
+
+</html>
